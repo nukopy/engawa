@@ -8,14 +8,14 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 use crate::{
     error::ClientError,
-    time::{get_jst_timestamp, timestamp_to_jst_rfc3339},
+    time::get_jst_timestamp,
     types::{
         ChatMessage, MessageType, ParticipantJoinedMessage, ParticipantLeftMessage,
         RoomConnectedMessage,
     },
 };
 
-use super::ui::redisplay_prompt;
+use super::{formatter::MessageFormatter, ui::redisplay_prompt};
 
 /// Run the WebSocket client session
 pub async fn run_client_session(
@@ -69,61 +69,55 @@ pub async fn run_client_session(
                 Ok(Message::Text(text)) => {
                     // Try to parse as RoomConnectedMessage first
                     if let Ok(room_msg) = serde_json::from_str::<RoomConnectedMessage>(&text) {
-                        println!(
-                            "\n\n============================================================"
+                        let formatted = MessageFormatter::format_room_connected(
+                            &room_msg.participants,
+                            &client_id_for_read,
                         );
-                        println!("Participants:");
-                        if room_msg.participants.is_empty() {
-                            println!("(No participants)");
-                        } else {
-                            for participant in &room_msg.participants {
-                                let is_me = participant.client_id == client_id_for_read;
-                                let me_suffix = if is_me { " (me)" } else { "" };
-                                let timestamp_str =
-                                    timestamp_to_jst_rfc3339(participant.connected_at);
-                                println!(
-                                    "{}{} - entered at {}",
-                                    participant.client_id, me_suffix, timestamp_str
-                                );
-                            }
-                        }
-                        println!("============================================================\n");
+                        print!("{}", formatted);
                         redisplay_prompt(&client_id_for_read);
                     }
                     // Try to parse as ParticipantJoinedMessage
                     else if let Ok(joined_msg) =
                         serde_json::from_str::<ParticipantJoinedMessage>(&text)
                     {
-                        let timestamp_str = timestamp_to_jst_rfc3339(joined_msg.connected_at);
-                        println!("\n+ {} entered at {}", joined_msg.client_id, timestamp_str);
+                        let formatted = MessageFormatter::format_participant_joined(
+                            &joined_msg.client_id,
+                            joined_msg.connected_at,
+                        );
+                        print!("{}", formatted);
                         redisplay_prompt(&client_id_for_read);
                     }
                     // Try to parse as ParticipantLeftMessage
                     else if let Ok(left_msg) =
                         serde_json::from_str::<ParticipantLeftMessage>(&text)
                     {
-                        let timestamp_str = timestamp_to_jst_rfc3339(left_msg.disconnected_at);
-                        println!("\n- {} left at {}", left_msg.client_id, timestamp_str);
+                        let formatted = MessageFormatter::format_participant_left(
+                            &left_msg.client_id,
+                            left_msg.disconnected_at,
+                        );
+                        print!("{}", formatted);
                         redisplay_prompt(&client_id_for_read);
                     }
                     // Try to parse as ChatMessage
                     else if let Ok(chat_msg) = serde_json::from_str::<ChatMessage>(&text) {
-                        println!(
-                            "\n\n------------------------------------------------------------"
+                        let formatted = MessageFormatter::format_chat_message(
+                            &chat_msg.client_id,
+                            &chat_msg.content,
+                            chat_msg.timestamp,
                         );
-                        println!("@{}: {}", chat_msg.client_id, chat_msg.content);
-                        println!("sent at {}", timestamp_to_jst_rfc3339(chat_msg.timestamp));
-                        println!("------------------------------------------------------------\n");
+                        print!("{}", formatted);
                         redisplay_prompt(&client_id_for_read);
                     }
                     // If parsing fails, display as raw text
                     else {
-                        println!("\n← Received: {}", text);
+                        let formatted = MessageFormatter::format_raw_message(&text);
+                        print!("{}", formatted);
                         redisplay_prompt(&client_id_for_read);
                     }
                 }
                 Ok(Message::Binary(data)) => {
-                    println!("\n← Received {} bytes of binary data", data.len());
+                    let formatted = MessageFormatter::format_binary_message(data.len());
+                    print!("{}", formatted);
                     redisplay_prompt(&client_id_for_read);
                 }
                 Ok(Message::Close(_)) => {
@@ -221,7 +215,8 @@ pub async fn run_client_session(
             }
 
             // Display sent timestamp and redisplay prompt
-            println!("\nsent at {}", timestamp_to_jst_rfc3339(msg.timestamp));
+            let formatted = MessageFormatter::format_sent_confirmation(msg.timestamp);
+            print!("\n{}", formatted);
             redisplay_prompt(&client_id_for_write);
         }
 
