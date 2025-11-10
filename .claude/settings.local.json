@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cargo clippy:*)",
       "Bash(cargo build:*)",
-      "Bash(cargo fmt:*)"
+      "Bash(cargo fmt:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
