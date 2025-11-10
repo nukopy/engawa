@@ -37,6 +37,12 @@ Rust + Axum + WebSocket で作るチャットアプリ
 cargo run --bin server
 ```
 
+help
+
+```sh
+cargo run --bin server -- --help
+```
+
 ### クライアントの起動
 
 ```sh
@@ -44,6 +50,12 @@ cargo run --bin client -- --client-id alice
 
 # 別ターミナルで起動
 cargo run --bin client -- --client-id bob
+```
+
+help
+
+```sh
+cargo run --bin client -- --help
 ```
 
 ### 特徴
