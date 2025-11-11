@@ -115,12 +115,12 @@
 ### Phase 5: テストとドキュメント
 
 - [x] cargo fmt 実行
-- [x] cargo test 実行（54 tests passed）
-- [ ] API エンドポイントの統合テストを追加
-  - [ ] /api/health のテスト
-  - [ ] /api/rooms のテスト
-  - [ ] /api/rooms/:room_id のテスト（正常系・異常系）
-- [ ] cargo clippy 実行
+- [x] cargo test 実行（69 tests passed）
+- [x] API エンドポイントの統合テストを追加
+  - [x] /api/health のテスト
+  - [x] /api/rooms のテスト
+  - [x] /api/rooms/:room_id のテスト（正常系・異常系）
+- [x] cargo clippy 実行
 - [x] タスクドキュメント作成
 
 ### Phase 6: Cleanup（保留中のタスク）
@@ -129,12 +129,36 @@
   - server/domain.rs → server/participant_logic.rs or server/room_logic.rs
   - client/domain.rs → client/connection_logic.rs or client/session_logic.rs
 
+### Phase 7: RoomId UUID v4 対応と Factory パターン導入
+
+- [x] uuid クレートを追加（v1.11, features: v4, serde）
+- [x] RoomId を UUID フォーマット専用に変更
+  - [x] `RoomId::new()` を UUID バリデーションのみに簡素化（長さチェック削除）
+  - [x] `RoomId::from_uuid(uuid: Uuid)` メソッドを追加
+  - [x] `new_v4()` メソッドを削除（Factory に移動）
+- [x] RoomIdFactory を作成（`src/domain/factory.rs`）
+  - [x] `generate()` メソッドで UUID v4 を生成
+  - [x] Factory のテストを追加（2 tests）
+- [x] エラー型の更新
+  - [x] `ValueObjectError::RoomIdTooLong` を削除
+  - [x] `ValueObjectError::RoomIdInvalidFormat` のメッセージを更新
+- [x] 使用箇所の更新
+  - [x] `src/server/runner.rs` で RoomIdFactory を使用
+  - [x] `src/domain/entity.rs` のテストで RoomIdFactory を使用
+  - [x] `tests/http_api.rs` を UUID 形式に対応
+- [x] テストの実行と検証
+  - [x] 単体テスト: 61 tests passed
+  - [x] 統合テスト: 12 tests passed
+  - [x] cargo clippy: 警告なし
+
 ## 進捗状況
 
 - **開始日**: 2025-11-11
-- **現在のフェーズ**: Phase 5 - テストとドキュメント
-- **完了タスク数**: 32/38
-- **次のアクション**: API エンドポイントの統合テストを追加
+- **完了日**: 2025-11-11
+- **ステータス**: ✅ **完了（クローズ）**
+- **現在のフェーズ**: Phase 7 完了
+- **完了タスク数**: 54/54
+- **次のアクション**: なし（Phase 6 は保留中のままタスククローズ）
 - **ブロッカー**: なし
 
 ## 備考
@@ -158,12 +182,17 @@
 現在のテストカバレッジ：
 
 - Value Objects: 12 tests
-- Domain Models: 6 tests
+- Domain Entities: 9 tests
 - DTO Conversions: 4 tests
 - その他（formatter, domain logic, time）: 32 tests
-- **合計**: 54 tests
-
-API エンドポイントの統合テストはまだ追加していない。
+- **API 統合テスト**: 4 tests
+  - `/api/health` エンドポイント
+  - `/api/rooms` エンドポイント（一覧）
+  - `/api/rooms/:room_id` エンドポイント（詳細・正常系）
+  - `/api/rooms/:room_id` エンドポイント（404エラー）
+- **WebSocket 統合テスト**: 7 tests
+- その他: 1 test
+- **合計**: 69 tests ✅
 
 ## 参考資料
 
