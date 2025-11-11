@@ -12,6 +12,7 @@ name = "client"
 path = "src/bin/client.rs"
 
 [dependencies]
+async-trait = "0.1.89"
 axum = { version = "0.8.6", features = ["macros", "ws"] }
 chrono = "0.4"
 clap = { version = "4.5", features = ["derive"] }
