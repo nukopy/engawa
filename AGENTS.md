@@ -11,11 +11,8 @@
 
 ## プロジェクト構造とモジュール配置
 
-- `Cargo.toml` で Axum・Tokio・tracing などの依存と `server` / `client` の 2 バイナリを定義しています。
-- 共有型定義は `src/types.rs` に、サーバーロジックは `src/server.rs` に、クライアントロジックは `src/client.rs` に配置してください。
-- `src/lib.rs` では `run_server` と `run_client` のエントリーポイントを公開しています。
-- 各バイナリ固有コードは `src/bin/` 配下（`server.rs` と `client.rs`）に薄いラッパーとして配置し、`src/lib.rs` のエントリーポイントを呼び出します。
-- 実行生成物は `target/`、利用ガイドは `README.md`、自動化スクリプトは `Makefile` が増える想定があれば同階層に追加します。
+TODO: 概要を記述
+TODO: 実行時のエントリーポイントが src/bin/server.rs と src/bin/client.rs にあることを明記
 
 **モジュール構成の詳細は `docs/documentations/software-architecture.md` を参照してください。**
 
@@ -45,16 +42,7 @@
 プロジェクトは3層のテスト戦略を採用しています：
 
 1. **単体テスト（Unit Tests）**: ドメインロジックの純粋関数をテスト
-   - `src/server/domain.rs`: 参加者リスト生成、重複検出、ブロードキャスト対象選定
-   - `src/client/domain.rs`: 再接続判定、即座終了判定
-   - `src/client/formatter.rs`: メッセージフォーマット関数
-   - `src/time.rs`: Clock 抽象化（SystemClock, FixedClock）
-
 2. **統合テスト（Integration Tests）**: プロセスベースで実際のサーバー・クライアント間通信をテスト
-   - `tests/integration_test.rs`: サーバー起動、クライアント接続、メッセージブロードキャスト、参加者通知
-   - `TestServer` と `TestClient` ヘルパーを使用して実プロセスを起動
-   - 各テストは異なるポートを使用して並行実行を回避
-
 3. **手動 E2E テスト**: 実際のユーザーシナリオを手動で検証
    - 複数クライアントでのリアルタイムチャット
    - UI/UX の確認（プロンプト表示、カーソル制御など）
