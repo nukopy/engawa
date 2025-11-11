@@ -5,7 +5,28 @@
 [github-actions-badge-ci]: https://github.com/nukopy/chat-app-rs/actions/workflows/ci.yml/badge.svg?branch=main
 [github-actions-url-ci]: https://github.com/nukopy/chat-app-rs/actions/workflows/ci.yml?query=branch:main
 
-Rust + Axum + WebSocket で作るチャットアプリ
+DDD、Layered Architecture を採用した、Rust + Axum + WebSocket のチャットアプリ
+
+## 技術スタック
+
+- Rust 1.90.0
+- Axum 0.8.6
+
+## システム構成
+
+```mermaid
+graph TD
+    %% 登場人物
+    Client1[Client 1（CLI Application）]
+    Client2[Client 2]
+    Client3[Client 3]
+    Server[Server]
+
+    %% データフロー
+    Client1 -->| メッセージ送信 | Server
+    Server -->| メッセージ受信 | Client2
+    Server -->| メッセージ受信 | Client3
+```
 
 ## 機能
 
