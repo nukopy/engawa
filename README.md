@@ -5,7 +5,7 @@
 [github-actions-badge-ci]: https://github.com/nukopy/chat-app-rs/actions/workflows/ci.yml/badge.svg?branch=main
 [github-actions-url-ci]: https://github.com/nukopy/chat-app-rs/actions/workflows/ci.yml?query=branch:main
 
-DDD、Layered Architecture を採用した、Rust + Axum + WebSocket のチャットアプリ
+Layered Architecture / DDD を採用した、Rust + Axum + WebSocket のチャットアプリ
 
 ## 技術スタック
 
