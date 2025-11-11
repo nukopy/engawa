@@ -4,6 +4,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use tokio::sync::{Mutex, mpsc};
 
+use crate::domain::Room;
+
 /// Query parameters for WebSocket connection
 #[derive(Debug, Deserialize)]
 pub struct ConnectQuery {
@@ -22,4 +24,6 @@ pub struct ClientInfo {
 pub struct AppState {
     /// Map of client_id to their connection info
     pub connected_clients: Mutex<HashMap<String, ClientInfo>>,
+    /// Domain model: chat room with participants and message history
+    pub room: Mutex<Room>,
 }

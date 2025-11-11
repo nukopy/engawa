@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use crate::{time::timestamp_to_jst_rfc3339, types::ParticipantInfo};
+use crate::{infrastructure::dto::websocket::ParticipantInfo, time::timestamp_to_jst_rfc3339};
 
 /// Message formatter for client display
 pub struct MessageFormatter;

@@ -5,7 +5,16 @@ use std::{collections::HashMap, sync::Arc};
 use axum::{Router, routing::get};
 use tokio::sync::Mutex;
 
-use super::{handler::websocket_handler, signal::shutdown_signal, state::AppState};
+use crate::{
+    domain::{Room, RoomId, Timestamp},
+    time::get_jst_timestamp,
+};
+
+use super::{
+    handler::{debug_room_state, get_room_detail, get_rooms, health_check, websocket_handler},
+    signal::shutdown_signal,
+    state::AppState,
+};
 
 /// Run the WebSocket chat server
 ///
@@ -16,10 +25,21 @@ use super::{handler::websocket_handler, signal::shutdown_signal, state::AppState
 pub async fn run_server(host: String, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     // Create shared state for client management
     let connected_clients = Mutex::new(HashMap::new());
-    let app_state = Arc::new(AppState { connected_clients });
+    let room = Mutex::new(Room::new(
+        RoomId::new("default".to_string()).expect("Failed to create RoomId"),
+        Timestamp::new(get_jst_timestamp()),
+    ));
+    let app_state = Arc::new(AppState {
+        connected_clients,
+        room,
+    });
 
     let app = Router::new()
         .route("/ws", get(websocket_handler))
+        .route("/debug/room", get(debug_room_state))
+        .route("/api/health", get(health_check))
+        .route("/api/rooms", get(get_rooms))
+        .route("/api/rooms/{room_id}", get(get_room_detail))
         .with_state(app_state);
 
     let bind_addr = format!("{}:{}", host, port);

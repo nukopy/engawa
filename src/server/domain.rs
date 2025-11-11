@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::types::ParticipantInfo;
+use crate::infrastructure::dto::websocket::ParticipantInfo;
 
 use super::state::ClientInfo;
 

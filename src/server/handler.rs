@@ -3,8 +3,9 @@
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::{
-        Query, State,
+        Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
@@ -14,11 +15,15 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::mpsc;
 
 use crate::{
-    time::get_jst_timestamp,
-    types::{
-        ChatMessage, MessageType, ParticipantInfo, ParticipantJoinedMessage,
-        ParticipantLeftMessage, RoomConnectedMessage,
+    domain::{ClientId, Room, Timestamp},
+    infrastructure::dto::{
+        http::{ParticipantDetailDto, RoomDetailDto, RoomSummaryDto},
+        websocket::{
+            ChatMessage, MessageType, ParticipantInfo, ParticipantJoinedMessage,
+            ParticipantLeftMessage, RoomConnectedMessage,
+        },
     },
+    time::{get_jst_timestamp, timestamp_to_jst_rfc3339},
 };
 
 use super::state::{AppState, ClientInfo, ConnectQuery};
@@ -52,6 +57,21 @@ pub async fn websocket_handler(
             connected_at,
         };
         clients.insert(client_id.clone(), client_info);
+    }
+
+    // Add participant to domain model
+    {
+        let mut room = state.room.lock().await;
+        if let Err(e) = room.add_participant(crate::domain::Participant::new(
+            ClientId::new(client_id.clone()).expect("ClientId should be valid"),
+            Timestamp::new(connected_at),
+        )) {
+            tracing::warn!("Failed to add participant '{}' to room: {}", client_id, e);
+            // Remove from connected clients since we couldn't add to domain model
+            let mut clients = state.connected_clients.lock().await;
+            clients.remove(&client_id);
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
     }
 
     tracing::info!("Client '{}' connected and registered", client_id);
@@ -166,6 +186,14 @@ pub async fn handle_socket(
                         response.content
                     );
 
+                    // Add message to domain model
+                    {
+                        let mut room = state_clone.room.lock().await;
+                        if let Err(e) = room.add_message(response.clone().into()) {
+                            tracing::warn!("Failed to add message to room history: {}", e);
+                        }
+                    }
+
                     // Send to all connected clients EXCEPT the sender
                     let clients = state_clone.connected_clients.lock().await;
                     for (id, client_info) in clients.iter() {
@@ -231,4 +259,67 @@ pub async fn handle_socket(
         }
         tracing::info!("Broadcasted participant-left for '{}'", client_id);
     }
+
+    // Remove participant from domain model
+    {
+        let mut room = state.room.lock().await;
+        let client_id_vo = ClientId::new(client_id.clone()).expect("ClientId should be valid");
+        room.remove_participant(&client_id_vo);
+    }
+}
+
+/// Debug endpoint to get current room state (for testing purposes)
+pub async fn debug_room_state(State(state): State<Arc<AppState>>) -> Json<Room> {
+    let room = state.room.lock().await;
+    Json(room.clone())
+}
+
+/// Health check endpoint
+pub async fn health_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({"status": "ok"}))
+}
+
+/// Get list of rooms
+pub async fn get_rooms(State(state): State<Arc<AppState>>) -> Json<Vec<RoomSummaryDto>> {
+    let room = state.room.lock().await;
+
+    let room_summary = RoomSummaryDto {
+        id: room.id.as_str().to_string(),
+        participants: room
+            .participants
+            .iter()
+            .map(|p| p.id.as_str().to_string())
+            .collect(),
+        created_at: timestamp_to_jst_rfc3339(room.created_at.value()),
+    };
+
+    Json(vec![room_summary])
+}
+
+/// Get room detail by ID
+pub async fn get_room_detail(
+    State(state): State<Arc<AppState>>,
+    Path(room_id): Path<String>,
+) -> Result<Json<RoomDetailDto>, StatusCode> {
+    let room = state.room.lock().await;
+
+    // Check if the requested room_id matches
+    if room.id.as_str() != room_id {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let room_detail = RoomDetailDto {
+        id: room.id.as_str().to_string(),
+        participants: room
+            .participants
+            .iter()
+            .map(|p| ParticipantDetailDto {
+                client_id: p.id.as_str().to_string(),
+                connected_at: timestamp_to_jst_rfc3339(p.connected_at.value()),
+            })
+            .collect(),
+        created_at: timestamp_to_jst_rfc3339(room.created_at.value()),
+    };
+
+    Ok(Json(room_detail))
 }
