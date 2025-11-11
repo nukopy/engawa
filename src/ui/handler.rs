@@ -15,6 +15,7 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::mpsc;
 
 use crate::{
+    common::time::{get_jst_timestamp, timestamp_to_jst_rfc3339},
     domain::{ClientId, Room, Timestamp},
     infrastructure::dto::{
         http::{ParticipantDetailDto, RoomDetailDto, RoomSummaryDto},
@@ -23,7 +24,6 @@ use crate::{
             ParticipantLeftMessage, RoomConnectedMessage,
         },
     },
-    time::{get_jst_timestamp, timestamp_to_jst_rfc3339},
 };
 
 use super::state::{AppState, ClientInfo, ConnectQuery};

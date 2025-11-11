@@ -2,7 +2,9 @@
 
 #![allow(dead_code)]
 
-use crate::{infrastructure::dto::websocket::ParticipantInfo, time::timestamp_to_jst_rfc3339};
+use crate::{
+    common::time::timestamp_to_jst_rfc3339, infrastructure::dto::websocket::ParticipantInfo,
+};
 
 /// Message formatter for client display
 pub struct MessageFormatter;
@@ -40,7 +42,7 @@ impl MessageFormatter {
             }
         }
 
-        output.push_str("============================================================\n");
+        output.push_str("============================================================\n\n");
         output
     }
 
@@ -91,7 +93,7 @@ impl MessageFormatter {
             "\n\n------------------------------------------------------------\n\
              @{}: {}\n\
              sent at {}\n\
-             ------------------------------------------------------------\n",
+             ------------------------------------------------------------\n\n",
             from, content, timestamp_str
         )
     }

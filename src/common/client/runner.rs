@@ -2,9 +2,7 @@
 
 use std::time::Duration;
 
-use crate::error::ClientError;
-
-use super::session::run_client_session;
+use super::{error::ClientError, session::run_client_session};
 
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
 const RECONNECT_INTERVAL_SECS: u64 = 5;

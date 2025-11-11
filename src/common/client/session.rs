@@ -7,15 +7,14 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 use crate::{
-    error::ClientError,
+    common::time::get_jst_timestamp,
     infrastructure::dto::websocket::{
         ChatMessage, MessageType, ParticipantJoinedMessage, ParticipantLeftMessage,
         RoomConnectedMessage,
     },
-    time::get_jst_timestamp,
 };
 
-use super::{formatter::MessageFormatter, ui::redisplay_prompt};
+use super::{error::ClientError, formatter::MessageFormatter, ui::redisplay_prompt};
 
 /// Run the WebSocket client session
 pub async fn run_client_session(

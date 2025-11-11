@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use crate::error::ClientError;
+use super::error::ClientError;
 
 /// Check if the client should exit immediately based on the error type.
 ///

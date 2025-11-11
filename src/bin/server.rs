@@ -8,7 +8,7 @@
 //! cargo run --bin server -- --host 0.0.0.0 --port 3000
 //! ```
 
-use chat_app_rs::logger::setup_logger;
+use chat_app_rs::common::logger::setup_logger;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -32,7 +32,7 @@ async fn main() {
     let args = Args::parse();
 
     // Run the server
-    if let Err(e) = chat_app_rs::run_server(args.host, args.port).await {
+    if let Err(e) = chat_app_rs::ui::run_server(args.host, args.port).await {
         tracing::error!("Server error: {}", e);
         std::process::exit(1);
     }

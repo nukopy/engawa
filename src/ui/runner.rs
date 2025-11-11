@@ -6,8 +6,8 @@ use axum::{Router, routing::get};
 use tokio::sync::Mutex;
 
 use crate::{
+    common::time::get_jst_timestamp,
     domain::{Room, RoomIdFactory, Timestamp},
-    time::get_jst_timestamp,
 };
 
 use super::{

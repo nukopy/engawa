@@ -1,6 +1,7 @@
 //! WebSocket chat client implementation.
 
 mod domain;
+mod error;
 mod formatter;
 mod runner;
 mod session;
