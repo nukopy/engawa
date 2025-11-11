@@ -6,7 +6,9 @@
       "Bash(cargo fmt:*)",
       "Bash(mkdir:*)",
       "Bash(cargo test:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git checkout:*)",
+      "Bash(TZ=Asia/Tokyo date:*)"
     ],
     "deny": [],
     "ask": []
