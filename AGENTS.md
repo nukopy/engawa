@@ -11,16 +11,51 @@
 
 ## プロジェクト構造とモジュール配置
 
-本プロジェクトは以下の構造で構成されています：
+本プロジェクトはレイヤードアーキテクチャに基づいて構成されています。**サーバロジックを中心に設計**されており、クライアントはテスト用ユーティリティとして位置づけています。
 
-- **実行バイナリ**: `src/bin/server.rs` と `src/bin/client.rs` がエントリーポイント
-- **ドメイン層**: `src/domain/` にドメインモデル、値オブジェクト、エンティティを配置
-- **インフラストラクチャ層**: `src/infrastructure/` に DTO（WebSocket/HTTP プロトコル別）を配置
-- **アプリケーション層**: `src/server/`, `src/client/` にサーバー・クライアントの実装を配置
-- **統合テスト**: `tests/` にテスト性質別（接続、ビジネスルール、メッセージング、HTTP API）のテストを配置
-- **テストフィクスチャ**: `tests/fixtures/` に共有テストヘルパーを配置
+### ディレクトリ構成
 
-**モジュール構成の詳細は `docs/documentations/software-architecture.md` を参照してください。**
+```sh
+$ tree -L 2 .
+.
+├── Cargo.toml              # プロジェクト設定、依存関係定義
+├── README.md               # プロジェクト概要
+├── AGENTS.md               # リポジトリガイドライン（本ファイル）
+├── CLAUDE.md               # Claude への指示
+├── docs/
+│   ├── documentations/     # アーキテクチャ・DDD 設計ドキュメント
+│   ├── note/               # 開発メモ
+│   └── tasks/              # タスク管理ドキュメント
+├── src/
+│   ├── bin/                # 実行バイナリのエントリーポイント
+│   │   ├── server.rs       # サーバアプリケーション起動
+│   │   └── client.rs       # テスト用クライアント起動
+│   ├── common/             # 共通ユーティリティ（ロガー、時刻管理）
+│   ├── domain/             # ドメイン層（エンティティ、値オブジェクト、Factory）
+│   ├── infrastructure/     # インフラ層（DTO、変換ロジック）
+│   ├── ui/                 # UI 層（HTTP/WebSocket ハンドラー、ルーティング、状態管理）
+│   ├── usecase/            # UseCase 層（ビジネスロジック）※現在実装中
+│   ├── utils/              # ユーティリティ
+│   │   └── client/         # テスト用クライアント実装（旧 src/client/）
+│   └── lib.rs              # ライブラリエントリーポイント
+└── tests/
+    ├── fixtures/           # テスト共有ヘルパー（TestServer, TestClient）
+    ├── http_api.rs         # HTTP API 統合テスト
+    ├── websocket_connection.rs  # WebSocket 接続テスト
+    └── websocket_messaging.rs   # WebSocket メッセージングテスト
+```
+
+### レイヤー構成
+
+本プロジェクトは以下のレイヤーで構成されています（依存方向：上→下）：
+
+- **UI 層** (`src/ui/`): HTTP/WebSocket ハンドラー、ルーティング設定、サーバー起動
+- **UseCase 層** (`src/usecase/`): ビジネスロジック、ユースケース実装 ※現在実装中
+- **Domain 層** (`src/domain/`): エンティティ、値オブジェクト、Factory、ドメインエラー
+- **Infrastructure 層** (`src/infrastructure/`): DTO（Data Transfer Object）、ドメインモデル変換
+- **Common** (`src/common/`): レイヤー横断的なユーティリティ（ロガー、時刻管理）
+
+詳細なモジュール構成と設計方針は `docs/documentations/software-architecture.md` を参照してください。
 
 ## ビルド・テスト・開発コマンド
 
