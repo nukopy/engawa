@@ -1,20 +1,13 @@
 //! Server state and connection management.
 
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
-use crate::domain::RoomRepository;
-
-/// Client connection information
-pub struct ClientInfo {
-    /// Message sender channel
-    pub sender: mpsc::UnboundedSender<String>,
-    /// Unix timestamp when connected (in JST, milliseconds)
-    pub connected_at: i64,
-}
+use crate::domain::{MessagePusher, RoomRepository};
 
 /// Shared application state
 pub struct AppState {
     /// Repository（データアクセス層の抽象化）
     pub repository: Arc<dyn RoomRepository>,
+    /// MessagePusher（メッセージ通知の抽象化）
+    pub message_pusher: Arc<dyn MessagePusher>,
 }

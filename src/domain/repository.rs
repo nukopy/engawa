@@ -4,7 +4,6 @@
 //! 具体的な実装は Infrastructure 層が提供します（依存性の逆転）。
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::UnboundedSender;
 
 use super::{ClientId, MessageContent, Participant, RepositoryError, Room, Timestamp};
 
@@ -23,21 +22,14 @@ pub trait RoomRepository: Send + Sync {
     /// Room エンティティを取得
     async fn get_room(&self) -> Result<Room, RepositoryError>;
 
-    /// 参加者を追加（connected_clients と room の両方を更新）
-    ///
-    /// ## 技術的負債
-    ///
-    /// `UnboundedSender<String>` はインフラ層の実装詳細（InMemory 実装用）です。
-    /// 本来、ドメイン層の Repository trait にインフラ実装詳細を含めるべきではありません。
-    /// 将来的には、メッセージ送信の仕組みをドメイン層から分離する必要があります。
+    /// 参加者を追加
     async fn add_participant(
         &self,
         client_id: ClientId,
-        sender: UnboundedSender<String>,
         timestamp: Timestamp,
     ) -> Result<(), RepositoryError>;
 
-    /// 参加者を削除（connected_clients と room の両方から削除）
+    /// 参加者を削除
     async fn remove_participant(&self, client_id: &ClientId) -> Result<(), RepositoryError>;
 
     /// 接続中の全てのクライアント ID を取得
@@ -56,25 +48,4 @@ pub trait RoomRepository: Send + Sync {
 
     /// Room の参加者リストを取得
     async fn get_participants(&self) -> Vec<Participant>;
-
-    /// クライアントのメッセージ送信チャンネルを取得
-    ///
-    /// ## 技術的負債
-    ///
-    /// `UnboundedSender<String>` はインフラ層の実装詳細です。
-    /// 将来的には MessageBroker を導入して通信を分離する必要があります。
-    async fn get_client_sender(&self, client_id: &str) -> Option<UnboundedSender<String>>;
-
-    /// 全てのクライアントのメッセージ送信チャンネルを取得
-    ///
-    /// ## 技術的負債
-    ///
-    /// `UnboundedSender<String>` はインフラ層の実装詳細です。
-    /// 将来的には MessageBroker を導入して通信を分離する必要があります。
-    async fn get_all_client_senders(
-        &self,
-    ) -> std::collections::HashMap<String, UnboundedSender<String>>;
-
-    /// クライアントの接続時刻を取得
-    async fn get_client_connected_at(&self, client_id: &str) -> Option<i64>;
 }

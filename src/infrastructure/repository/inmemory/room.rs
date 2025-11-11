@@ -15,40 +15,28 @@
 //!
 //! PostgreSQL 実装時に対応予定。
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::sync::{Mutex, mpsc::UnboundedSender};
+use tokio::sync::Mutex;
 
-use crate::{
-    domain::{
-        ChatMessage, ClientId, MessageContent, Participant, RepositoryError, Room, RoomRepository,
-        Timestamp,
-    },
-    ui::state::ClientInfo,
+use crate::domain::{
+    ChatMessage, ClientId, MessageContent, Participant, RepositoryError, Room, RoomRepository,
+    Timestamp,
 };
 
 /// インメモリ Room Repository 実装
 ///
-/// HashMap をインメモリ DB として使用する実装。
-/// ドメイン層の RoomRepository trait を実装します（依存性の逆転）。
+/// Room ドメインモデルを保持し、ドメイン層の RoomRepository trait を実装します（依存性の逆転）。
 pub struct InMemoryRoomRepository {
-    /// 接続中のクライアント情報（WebSocket sender を含む）
-    connected_clients: Arc<Mutex<HashMap<String, ClientInfo>>>,
     /// Room ドメインモデル
     room: Arc<Mutex<Room>>,
 }
 
 impl InMemoryRoomRepository {
     /// 新しい InMemoryRoomRepository を作成
-    pub fn new(
-        connected_clients: Arc<Mutex<HashMap<String, ClientInfo>>>,
-        room: Arc<Mutex<Room>>,
-    ) -> Self {
-        Self {
-            connected_clients,
-            room,
-        }
+    pub fn new(room: Arc<Mutex<Room>>) -> Self {
+        Self { room }
     }
 }
 
@@ -62,54 +50,26 @@ impl RoomRepository for InMemoryRoomRepository {
     async fn add_participant(
         &self,
         client_id: ClientId,
-        sender: UnboundedSender<String>,
         timestamp: Timestamp,
     ) -> Result<(), RepositoryError> {
-        // First, try to add to room (domain model will handle validation)
         let participant = Participant::new(client_id.clone(), timestamp);
 
-        {
-            let mut room = self.room.lock().await;
-            room.add_participant(participant).map_err(|_| {
-                RepositoryError::ParticipantNotFound(client_id.as_str().to_string())
-            })?;
-        }
-
-        // Only if room addition succeeds, add to connected_clients
-        let mut clients = self.connected_clients.lock().await;
-        clients.insert(
-            client_id.as_str().to_string(),
-            ClientInfo {
-                sender,
-                connected_at: timestamp.value(),
-            },
-        );
+        let mut room = self.room.lock().await;
+        room.add_participant(participant)
+            .map_err(|_| RepositoryError::ParticipantNotFound(client_id.as_str().to_string()))?;
 
         Ok(())
     }
 
     async fn remove_participant(&self, client_id: &ClientId) -> Result<(), RepositoryError> {
-        let client_id_str = client_id.as_str();
-
-        // Remove from connected_clients
-        let mut clients = self.connected_clients.lock().await;
-        clients
-            .remove(client_id_str)
-            .ok_or_else(|| RepositoryError::ClientInfoNotFound(client_id_str.to_string()))?;
-
-        // Remove from room
         let mut room = self.room.lock().await;
         room.remove_participant(client_id);
-
         Ok(())
     }
 
     async fn get_all_connected_client_ids(&self) -> Vec<ClientId> {
-        let clients = self.connected_clients.lock().await;
-        clients
-            .keys()
-            .filter_map(|k| ClientId::new(k.clone()).ok())
-            .collect()
+        let room = self.room.lock().await;
+        room.participants.iter().map(|p| p.id.clone()).collect()
     }
 
     async fn add_message(
@@ -126,33 +86,13 @@ impl RoomRepository for InMemoryRoomRepository {
     }
 
     async fn count_connected_clients(&self) -> usize {
-        let clients = self.connected_clients.lock().await;
-        clients.len()
+        let room = self.room.lock().await;
+        room.participants.len()
     }
 
     async fn get_participants(&self) -> Vec<Participant> {
         let room = self.room.lock().await;
         room.participants.clone()
-    }
-
-    async fn get_client_sender(&self, client_id: &str) -> Option<UnboundedSender<String>> {
-        let clients = self.connected_clients.lock().await;
-        clients.get(client_id).map(|info| info.sender.clone())
-    }
-
-    async fn get_all_client_senders(
-        &self,
-    ) -> std::collections::HashMap<String, UnboundedSender<String>> {
-        let clients = self.connected_clients.lock().await;
-        clients
-            .iter()
-            .map(|(id, info)| (id.clone(), info.sender.clone()))
-            .collect()
-    }
-
-    async fn get_client_connected_at(&self, client_id: &str) -> Option<i64> {
-        let clients = self.connected_clients.lock().await;
-        clients.get(client_id).map(|info| info.connected_at)
     }
 }
 
@@ -160,7 +100,6 @@ impl RoomRepository for InMemoryRoomRepository {
 mod tests {
     use super::*;
     use crate::{common::time::get_jst_timestamp, domain::RoomIdFactory};
-    use tokio::sync::mpsc;
 
     // ========================================
     // テスト作業記録
@@ -184,26 +123,24 @@ mod tests {
     // ========================================
 
     fn create_test_repository() -> InMemoryRoomRepository {
-        let connected_clients = Arc::new(Mutex::new(HashMap::new()));
         let room = Arc::new(Mutex::new(Room::new(
             RoomIdFactory::generate().expect("Failed to generate RoomId"),
             Timestamp::new(get_jst_timestamp()),
         )));
-        InMemoryRoomRepository::new(connected_clients, room)
+        InMemoryRoomRepository::new(room)
     }
 
     #[tokio::test]
     async fn test_add_participant_success() {
-        // テスト項目: 参加者を追加すると connected_clients と room の両方に反映される
+        // テスト項目: 参加者を追加すると room に反映される
         // given (前提条件):
         let repo = create_test_repository();
-        let (sender, _receiver) = mpsc::unbounded_channel();
         let timestamp = get_jst_timestamp();
 
         // when (操作):
         let client_id = ClientId::new("alice".to_string()).unwrap();
         let result = repo
-            .add_participant(client_id, sender, Timestamp::new(timestamp))
+            .add_participant(client_id, Timestamp::new(timestamp))
             .await;
 
         // then (期待する結果):
@@ -218,13 +155,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_participant_success() {
-        // テスト項目: 参加者を削除すると connected_clients と room の両方から削除される
+        // テスト項目: 参加者を削除すると room から削除される
         // given (前提条件):
         let repo = create_test_repository();
-        let (sender, _receiver) = mpsc::unbounded_channel();
         let timestamp = get_jst_timestamp();
         let client_id = ClientId::new("alice".to_string()).unwrap();
-        repo.add_participant(client_id.clone(), sender, Timestamp::new(timestamp))
+        repo.add_participant(client_id.clone(), Timestamp::new(timestamp))
             .await
             .unwrap();
 
@@ -241,7 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_nonexistent_participant() {
-        // テスト項目: 存在しない参加者を削除しようとするとエラーが返される
+        // テスト項目: 存在しない参加者を削除しても問題なく処理される（冪等性）
         // given (前提条件):
         let repo = create_test_repository();
 
@@ -249,12 +185,8 @@ mod tests {
         let nonexistent = ClientId::new("nonexistent".to_string()).unwrap();
         let result = repo.remove_participant(&nonexistent).await;
 
-        // then (期待する結果):
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            RepositoryError::ClientInfoNotFound(_)
-        ));
+        // then (期待する結果): エラーにならず、問題なく処理される
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -262,17 +194,15 @@ mod tests {
         // テスト項目: 接続中のクライアント数を正しくカウントできる
         // given (前提条件):
         let repo = create_test_repository();
-        let (sender1, _receiver1) = mpsc::unbounded_channel();
-        let (sender2, _receiver2) = mpsc::unbounded_channel();
         let timestamp = get_jst_timestamp();
 
         // when (操作):
         let alice = ClientId::new("alice".to_string()).unwrap();
         let bob = ClientId::new("bob".to_string()).unwrap();
-        repo.add_participant(alice, sender1, Timestamp::new(timestamp))
+        repo.add_participant(alice, Timestamp::new(timestamp))
             .await
             .unwrap();
-        repo.add_participant(bob, sender2, Timestamp::new(timestamp))
+        repo.add_participant(bob, Timestamp::new(timestamp))
             .await
             .unwrap();
 
@@ -285,17 +215,15 @@ mod tests {
         // テスト項目: 接続中の全てのクライアント ID を取得できる
         // given (前提条件):
         let repo = create_test_repository();
-        let (sender1, _receiver1) = mpsc::unbounded_channel();
-        let (sender2, _receiver2) = mpsc::unbounded_channel();
         let timestamp = get_jst_timestamp();
 
         // when (操作):
         let alice = ClientId::new("alice".to_string()).unwrap();
         let bob = ClientId::new("bob".to_string()).unwrap();
-        repo.add_participant(alice.clone(), sender1, Timestamp::new(timestamp))
+        repo.add_participant(alice.clone(), Timestamp::new(timestamp))
             .await
             .unwrap();
-        repo.add_participant(bob.clone(), sender2, Timestamp::new(timestamp))
+        repo.add_participant(bob.clone(), Timestamp::new(timestamp))
             .await
             .unwrap();
         let client_ids = repo.get_all_connected_client_ids().await;
@@ -311,10 +239,9 @@ mod tests {
         // テスト項目: メッセージを Room に追加できる
         // given (前提条件):
         let repo = create_test_repository();
-        let (sender, _receiver) = mpsc::unbounded_channel();
         let timestamp = get_jst_timestamp();
         let client_id = ClientId::new("alice".to_string()).unwrap();
-        repo.add_participant(client_id.clone(), sender, Timestamp::new(timestamp))
+        repo.add_participant(client_id.clone(), Timestamp::new(timestamp))
             .await
             .unwrap();
 
