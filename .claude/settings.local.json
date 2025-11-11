@@ -8,7 +8,8 @@
       "Bash(cargo test:*)",
       "Bash(tree:*)",
       "Bash(git checkout:*)",
-      "Bash(TZ=Asia/Tokyo date:*)"
+      "Bash(TZ=Asia/Tokyo date:*)",
+      "WebFetch(domain:blog.p1ass.com)"
     ],
     "deny": [],
     "ask": []
