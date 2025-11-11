@@ -215,7 +215,7 @@ pub async fn run_client_session(
 
             // Display sent timestamp and redisplay prompt
             let formatted = MessageFormatter::format_sent_confirmation(msg.timestamp);
-            print!("\n{}", formatted);
+            println!("{}", formatted);
             redisplay_prompt(&client_id_for_write);
         }
 
