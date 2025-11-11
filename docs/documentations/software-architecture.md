@@ -1,0 +1,329 @@
+# 本プロジェクトにおけるレイヤードアーキテクチャの適用
+
+本プロジェクトのソフトウェアアーキテクチャは [レイヤードアーキテクチャ](./layered-architecture.md) を適用しています。
+
+## レイヤードアーキテクチャの各レイヤーの定義
+
+参照元：[@docs/documentations/layered-architecture.md](./layered-architecture.md)
+
+- 「境界づけられたコンテキスト」単位で定義された Rust モジュールは、以下の 4 つの層（レイヤー）を中心に構成する
+  - UserInterface 層（UI 層、Presentation 層とも呼ばれる。本プロジェクトでは UserInterface 層と呼ぶ。）
+  - UseCase 層（Application 層とも呼ばれるが、本プロジェクトでは UseCase 層と呼ぶ）
+  - Domain 層
+  - Infrastructure 層
+- それぞれのレイヤーは同名の package にまとめる
+
+### UserInterface 層
+
+- UI 層、Presentation 層とも呼ばれる
+- API のクライアント（Web 画面や他システム等）との入出力を司る層
+- 主な責務
+  - クライアントから送信されたリクエストヘッダ、クエリパラメータ、フォームデータ等を取得
+  - 入力パラメータのバリデーションチェック
+  - Application 層の アプリケーションサービス のメソッドを呼び出し
+  - アプリケーションサービスの返却結果からレスポンスを構築
+
+### UseCase 層
+
+- Domain 層のエンティティ単位で アプリケーションサービス を宣言する
+- ユースケース単位で アプリケーションサービス のメソッドを作成する
+- 各メソッドは基本的にはドメインオブジェクトのメソッド呼び出しとエラーのハンドリングのみ実施する
+  - 条件判断や計算等の業務ロジックは アプリケーションサービス には記述せず、ドメインオブジェクト操作の処理順序のみが記述されているのが理想的
+  - 業務ロジックは後述する Domain 層に閉じ込める
+- DB トランザクションもアプリケーションサービスのメソッド単位で Commit/Rollback する形を基本とする
+
+### Domain 層
+
+- ドメインオブジェクトで構成される層（エンティティ、値オブジェクト、リポジトリ等）
+- 条件判断や計算等の業務ロジックはこの層のオブジェクトに極力入れるのが望ましい
+
+### Infrastructure 層
+
+- DB やファイル操作、外部 API 呼び出し等の外部システムへ接続して実施する操作を司る層
+
+## 各レイヤーの責務と配置場所
+
+### UserInterface 層（UI 層）
+
+**責務**:
+
+- 外部からのリクエストを受け取る
+- レスポンスを外部に返す
+- DTO（Data Transfer Object）の定義と変換
+
+**配置場所**:
+
+- `src/server/handler.rs` - WebSocket ハンドラー、REST API ハンドラー
+- `src/server/runner.rs` - サーバー起動とルーティング設定
+
+**依存関係**:
+
+- UseCase 層に依存
+- Domain 層に依存（DTO ⇔ Domain Model の変換のため）
+- Infrastructure 層に依存（DTO を使用）
+
+### UseCase 層（Application 層）
+
+**責務**:
+
+- ビジネスユースケースの実装
+- トランザクション管理
+- 複数の Domain Model を組み合わせた処理
+
+**配置場所**:
+
+- 現在のプロジェクトでは、UseCase 層は明示的に分離されていません
+- サーバーハンドラー内にビジネスロジックが含まれている状態です
+- 将来的に `src/usecase/` ディレクトリを作成し、以下のように分離することを推奨します：
+
+  ```sh
+  src/usecase/
+  ├── mod.rs
+  ├── connect_participant.rs    # 参加者接続のユースケース
+  ├── send_message.rs           # メッセージ送信のユースケース
+  └── disconnect_participant.rs # 参加者切断のユースケース
+  ```
+
+**依存関係**:
+
+- Domain 層に依存
+- Infrastructure 層に依存（Repository を使用）
+- UserInterface 層には依存しない
+
+### Domain 層
+
+**責務**:
+
+- ビジネスロジックの中核
+- ドメインモデル（Entity、Value Object）の定義
+- ドメインサービスの実装
+
+**配置場所**:
+
+- `src/domain/entity.rs` - Room, Participant, ChatMessage（Entity）
+- `src/domain/value_object.rs` - ClientId, RoomId, MessageContent, Timestamp（Value Object）
+- `src/domain/error.rs` - ドメイン層のエラー定義（thiserror 使用）
+
+**エラーハンドリング**:
+
+- **ドメイン層のエラーは `thiserror` を使って `src/domain/error.rs` に定義します**
+- Value Object のバリデーションエラーは `ValueObjectError` enum で定義
+- エラーメッセージは構造化されたフィールドを持ち、実際の値と期待値を含む
+- 例: `ClientIdTooLong { max: usize, actual: usize }`
+- エラーは型安全で、文字列の代わりに専用の型を使用
+
+**特徴**:
+
+- 他のレイヤーに依存しない（依存関係の逆転）
+- 純粋なビジネスロジックのみを含む
+- I/O や外部システムへの依存を持たない
+- エラー型も Domain 層で定義し、他層に漏らさない
+
+**依存関係**:
+
+- どのレイヤーにも依存しない（最も内側の層）
+
+### Infrastructure 層
+
+**責務**:
+
+- 外部システムとの接続
+- データの永続化
+- 外部 API の呼び出し
+- **DTO（Data Transfer Object）の定義と変換**
+
+**配置場所**:
+
+- `src/infrastructure/dto.rs` - WebSocket メッセージ、API レスポンスの DTO
+- `src/infrastructure/conversion.rs` - DTO ⇔ Domain Model の変換ロジック
+
+将来的にデータベースを導入する場合、以下のような構造を推奨します：
+
+  ```sh
+  src/infrastructure/
+  ├── mod.rs
+  ├── dto.rs                       # DTO 定義
+  ├── conversion.rs                # DTO 変換ロジック
+  ├── repository/
+  │   ├── mod.rs
+  │   ├── room_repository.rs        # Room の永続化
+  │   └── message_repository.rs     # Message の永続化
+  └── external/
+      └── notification_client.rs    # 外部通知サービスのクライアント
+  ```
+
+**DTO の配置について**:
+
+- **本プロジェクトでは DTO を Infrastructure 層に配置しています**
+- DTO は外部とのデータ交換のための型定義であり、通信プロトコルに依存します
+- DTO と Domain Model の変換ロジック（conversion）も Infrastructure 層に配置します
+- これにより、外部とのインターフェースに関する関心事を Infrastructure 層に集約できます
+
+**具体例**:
+
+- DTO の定義と変換
+- データベースアクセス（Repository の実装）
+- 外部 API クライアント
+- ファイルシステムアクセス
+- メッセージキューなど
+
+**依存関係**:
+
+- Domain 層に依存（Repository のインターフェースは Domain 層で定義、DTO 変換時に Domain Model を使用）
+- UserInterface 層や UseCase 層には依存しない
+
+## プロジェクト構造と層の対応
+
+現在のプロジェクト構造:
+
+```sh
+src/
+├── infrastructure/          # Infrastructure 層
+│   ├── mod.rs
+│   ├── conversion.rs       # DTO ⇔ Domain Entity 変換
+│   └── dto/
+│       ├── mod.rs
+│       ├── websocket.rs    # WebSocket DTO 定義
+│       └── http.rs         # HTTP API DTO 定義
+├── domain/                  # Domain 層
+│   ├── mod.rs
+│   ├── entity.rs           # Entity（Room, Participant, ChatMessage）
+│   ├── value_object.rs     # Value Object（ClientId, RoomId, etc.）
+│   └── error.rs            # ドメインエラー定義
+├── server/                  # UserInterface 層（サーバー）
+│   ├── handler.rs          # ハンドラー
+│   ├── runner.rs           # ルーティング
+│   ├── state.rs            # 状態管理
+│   ├── signal.rs           # シグナル処理
+│   └── domain.rs           # ※要リネーム（ドメインロジックではない）
+└── client/                  # UserInterface 層（クライアント）
+    ├── session.rs          # クライアント
+    ├── formatter.rs        # 表示フォーマット
+    └── domain.rs           # ※要リネーム（ドメインロジックではない）
+```
+
+## エラーハンドリング方針
+
+### 各レイヤーのエラー定義
+
+**基本方針**:
+
+- **各レイヤーは独自のエラー型を定義します**
+- すべてのエラーは `thiserror` を使って定義し、型安全性を確保します
+- エラーは文字列ではなく、構造化された enum で表現します
+
+**レイヤーごとのエラー配置**:
+
+1. **Domain 層**: `src/domain/error.rs`
+   - Value Object のバリデーションエラー
+   - ビジネスルール違反のエラー
+   - 例: `ValueObjectError::ClientIdEmpty`, `ValueObjectError::ClientIdTooLong { max, actual }`
+
+2. **Infrastructure 層**: `src/infrastructure/error.rs`（将来実装予定）
+   - データベース接続エラー
+   - 外部 API 呼び出しエラー
+   - DTO 変換エラー（必要に応じて）
+
+3. **UseCase 層**: `src/usecase/error.rs`（将来実装予定）
+   - ユースケース固有のエラー
+   - トランザクション管理エラー
+
+4. **UserInterface 層**: 各層のエラーを適切な HTTP ステータスコードやレスポンスに変換
+   - `src/error.rs` に既存のクライアントエラーが定義されている
+
+**エラー変換**:
+
+- 下位層（Domain）のエラーを上位層（UseCase, UserInterface）で変換
+- UserInterface 層では、適切な HTTP ステータスコードに変換
+
+## 今後の改善案
+
+1. **UseCase 層の分離**
+   - `src/usecase/` を作成し、ビジネスロジックをハンドラーから分離
+
+2. **Infrastructure 層の導入**（必要に応じて）
+   - データベース導入時に `src/infrastructure/repository/` を作成
+
+3. **ファイル名の明確化**
+   - `server/domain.rs` → `server/participant_logic.rs` または `server/broadcast_logic.rs`
+   - `client/domain.rs` → `client/reconnection_logic.rs` または `client/session_logic.rs`
+
+4. **DTO の分離**（プロジェクトが大きくなった場合）
+   - WebSocket 用と REST API 用で DTO を分離
+
+## モジュール命名規約
+
+### 基本原則
+
+- **モジュール名は単数形を使用します**。複数形は使用しません。
+  - ✅ 良い例: `value_object.rs`, `model.rs`, `error.rs`
+  - ❌ 悪い例: `value_objects.rs`, `models.rs`, `errors.rs`
+- **モジュール分割は `<モジュール名>/mod.rs` のパターンを採用します**。
+  - 例: `src/infrastructure/mod.rs`, `src/domain/mod.rs`
+
+### 適用例
+
+現在のプロジェクト構造:
+
+```sh
+src/domain/
+├── mod.rs
+├── entity.rs          # ✅ 単数形（Entity）
+├── value_object.rs    # ✅ 単数形（Value Object）
+└── error.rs           # ✅ 単数形（Error）
+
+src/infrastructure/
+├── mod.rs
+├── conversion.rs
+└── dto/
+    ├── mod.rs
+    ├── websocket.rs   # WebSocket DTO
+    └── http.rs        # HTTP API DTO
+```
+
+## ドメインモデリング（DDD）
+
+このプロジェクトはドメイン駆動設計（DDD）の原則に従ってドメインモデルを設計しています。
+
+### 基礎知識
+
+DDD の基本的な概念と Value Object パターンについては、`docs/documentations/ddd.md` を参照してください。
+
+### Value Objects
+
+以下のプリミティブ型は Value Object として定義されています（`src/domain/value_object.rs`）：
+
+- **ClientId**: クライアント識別子（最大100文字、空文字列不可）
+- **RoomId**: ルーム識別子（最大100文字、空文字列不可）
+- **MessageContent**: メッセージ内容（最大10000文字、空文字列不可）
+- **Timestamp**: Unix タイムスタンプ（ミリ秒）
+
+Value Object の特徴：
+
+- 不変（immutable）
+- 値が変わると別のオブジェクトになる
+- 同一性ではなく値で比較される（`PartialEq` を実装）
+- バリデーションロジックをコンストラクタに含む
+- `Display` trait を実装して文字列表現を提供
+
+### Domain Entities
+
+ドメインエンティティは `src/domain/entity.rs` に定義されています：
+
+- **Room**: チャットルーム（Entity）- RoomId、参加者リスト、メッセージ履歴、容量制限を保持
+- **Participant**: 参加者（Entity）- ClientId、接続時刻を保持
+- **ChatMessage**: チャットメッセージ（Entity）- 送信者 ClientId、メッセージ内容、タイムスタンプを保持
+
+### DTO と Domain Entity の分離
+
+- **DTO（Data Transfer Object）**: `src/infrastructure/dto/` - WebSocket・HTTP API 通信用の型定義
+- **Domain Entity**: `src/domain/entity.rs` - ビジネスロジック用のエンティティ定義
+- **Conversion**: `src/infrastructure/conversion.rs` - DTO と Domain Entity の相互変換ロジック
+
+DTO は外部とのインターフェースのみに使用し、内部のビジネスロジックでは Domain Entity を使用してください。
+
+## 参考資料
+
+- `docs/documentations/ddd.md` - DDD の基礎知識
+- `docs/documentations/layered-architecture-project.md` - レイヤードアーキテクチャの詳細
+- `AGENTS.md` - 開発全般のガイドライン
