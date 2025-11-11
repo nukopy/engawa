@@ -1,5 +1,10 @@
 # チャットアプリ with Rust + Axum + WebSocket
 
+[![GitHub Actions workflow badge - CI][github-actions-badge-ci]][github-actions-url-ci]
+
+[github-actions-badge-ci]: https://github.com/nukopy/chat-app-rs/actions/workflows/ci.yml/badge.svg?branch=main
+[github-actions-url-ci]: https://github.com/nukopy/chat-app-rs/actions/workflows/ci.yml?query=branch:main
+
 Rust + Axum + WebSocket で作るチャットアプリ
 
 ## 機能
