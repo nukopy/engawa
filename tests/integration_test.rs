@@ -184,7 +184,7 @@ fn test_duplicate_client_id_is_rejected() {
 
     // then (期待する結果):
     // Second client should exit due to duplicate ID error
-    let exit_result = client2.wait_for_exit(Duration::from_secs(3));
+    let exit_result = client2.wait_for_exit(Duration::from_secs(1));
     assert!(
         exit_result.is_ok(),
         "Second client should have exited within timeout"
