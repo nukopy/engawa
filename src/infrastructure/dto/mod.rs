@@ -4,5 +4,6 @@
 //! - `websocket`: WebSocket message DTOs
 //! - `http`: HTTP API response DTOs
 
+pub mod conversion;
 pub mod http;
 pub mod websocket;
