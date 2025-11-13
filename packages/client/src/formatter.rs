@@ -2,8 +2,8 @@
 
 #![allow(dead_code)]
 
-use server::infrastructure::dto::websocket::ParticipantInfo;
-use shared::time::timestamp_to_jst_rfc3339;
+use engawa_server::infrastructure::dto::websocket::ParticipantInfo;
+use engawa_shared::time::timestamp_to_jst_rfc3339;
 
 /// Message formatter for client display
 pub struct MessageFormatter;

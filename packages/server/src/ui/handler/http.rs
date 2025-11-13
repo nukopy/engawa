@@ -13,7 +13,7 @@ use crate::{
     infrastructure::dto::http::{ParticipantDetailDto, RoomDetailDto, RoomSummaryDto},
     ui::state::AppState,
 };
-use shared::time::timestamp_to_jst_rfc3339;
+use engawa_shared::time::timestamp_to_jst_rfc3339;
 
 /// Debug endpoint to get current room state (for testing purposes)
 pub async fn debug_room_state(State(state): State<Arc<AppState>>) -> Json<Room> {

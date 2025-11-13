@@ -6,11 +6,11 @@ use rustyline::error::ReadlineError;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-use server::infrastructure::dto::websocket::{
+use engawa_server::infrastructure::dto::websocket::{
     ChatMessage, MessageType, ParticipantJoinedMessage, ParticipantLeftMessage,
     RoomConnectedMessage,
 };
-use shared::time::get_jst_timestamp;
+use engawa_shared::time::get_jst_timestamp;
 
 use super::{error::ClientError, formatter::MessageFormatter, ui::redisplay_prompt};
 

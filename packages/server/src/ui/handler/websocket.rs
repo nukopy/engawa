@@ -21,7 +21,7 @@ use crate::{
     },
     ui::state::AppState,
 };
-use shared::time::get_jst_timestamp;
+use engawa_shared::time::get_jst_timestamp;
 
 use serde::Deserialize;
 

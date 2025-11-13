@@ -15,7 +15,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 /// # Examples
 ///
 /// ```no_run
-/// use shared::logger::setup_logger;
+/// use engawa_shared::logger::setup_logger;
 ///
 /// setup_logger("server", "debug");
 /// ```

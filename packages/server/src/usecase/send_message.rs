@@ -60,7 +60,7 @@ impl SendMessageUseCase {
         content: MessageContent,
         json_message: String,
     ) -> Result<Vec<ClientId>, SendMessageError> {
-        use shared::time::get_jst_timestamp;
+        use engawa_shared::time::get_jst_timestamp;
 
         let timestamp = Timestamp::new(get_jst_timestamp());
 
@@ -101,7 +101,7 @@ mod tests {
         domain::{MessagePushError, MessagePusher, PusherChannel, Room, RoomIdFactory, Timestamp},
         infrastructure::repository::InMemoryRoomRepository,
     };
-    use shared::time::get_jst_timestamp;
+    use engawa_shared::time::get_jst_timestamp;
     use std::sync::Arc;
     use tokio::sync::Mutex;
 

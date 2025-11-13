@@ -11,7 +11,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use clap::Parser;
-use server::{
+use engawa_server::{
     domain::{Room, RoomIdFactory, Timestamp},
     infrastructure::{message_pusher::WebSocketMessagePusher, repository::InMemoryRoomRepository},
     ui::Server,
@@ -20,7 +20,7 @@ use server::{
         GetRoomStateUseCase, GetRoomsUseCase, SendMessageUseCase,
     },
 };
-use shared::{logger::setup_logger, time::get_jst_timestamp};
+use engawa_shared::{logger::setup_logger, time::get_jst_timestamp};
 use tokio::sync::Mutex;
 
 #[derive(Parser, Debug)]

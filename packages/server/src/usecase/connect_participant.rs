@@ -60,7 +60,7 @@ impl ConnectParticipantUseCase {
         client_id: ClientId,
         sender: PusherChannel,
     ) -> Result<Timestamp, ConnectError> {
-        use shared::time::get_jst_timestamp;
+        use engawa_shared::time::get_jst_timestamp;
 
         // 1. 重複チェック
         let client_ids = self.repository.get_all_connected_client_ids().await;
@@ -140,7 +140,7 @@ mod tests {
             message_pusher::WebSocketMessagePusher, repository::InMemoryRoomRepository,
         },
     };
-    use shared::time::get_jst_timestamp;
+    use engawa_shared::time::get_jst_timestamp;
     use std::{collections::HashMap, sync::Arc};
     use tokio::sync::Mutex;
 

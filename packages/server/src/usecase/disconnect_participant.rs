@@ -120,7 +120,7 @@ mod tests {
             message_pusher::WebSocketMessagePusher, repository::InMemoryRoomRepository,
         },
     };
-    use shared::time::get_jst_timestamp;
+    use engawa_shared::time::get_jst_timestamp;
     use std::{collections::HashMap, sync::Arc};
     use tokio::sync::Mutex;
 
