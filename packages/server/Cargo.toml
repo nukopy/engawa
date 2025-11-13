@@ -15,7 +15,7 @@ Chat server for Engawa, chat application built with Axum and WebSocket.
 publish = true
 
 [[bin]]
-name = "server"
+name = "engawa-server"
 path = "src/bin/server.rs"
 
 [dependencies]

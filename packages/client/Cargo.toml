@@ -15,7 +15,7 @@ CLI chat client for Engawa, chat application built with Axum and WebSocket.
 publish = true
 
 [[bin]]
-name = "client"
+name = "engawa-client"
 path = "src/bin/client.rs"
 
 [dependencies]
