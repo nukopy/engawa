@@ -1,0 +1,121 @@
+# https://taskfile.dev
+
+version: "3"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  # ----------------------------------------------------------------------------
+  # basic tasks
+  # ----------------------------------------------------------------------------
+
+  fmt:
+    desc: Format code with rustfmt
+    cmds:
+      - cargo fmt
+
+  lint:
+    desc: Run clippy linter
+    cmds:
+      - cargo clippy --workspace --all-targets --all-features
+
+  check:
+    desc: Run cargo check
+    cmds:
+      - cargo check --workspace --all-targets --all-features
+
+  test:
+    desc: Run all tests
+    cmds:
+      - cargo test --workspace --all-targets --all-features --verbose
+
+  # ----------------------------------------------------------------------------
+  # CI tasks
+  # ----------------------------------------------------------------------------
+  _ci-before-test:
+    internal: true
+    desc: Run before test tasks
+    deps: [fmt, lint, check]
+
+  ci:
+    desc: Run all CI checks (_ci-before-test, test)
+    deps: [_ci-before-test, test]
+
+  # ----------------------------------------------------------------------------
+  # Build tasks
+  # ----------------------------------------------------------------------------
+
+  build:
+    desc: Build all packages in debug mode
+    cmds:
+      - cargo build --workspace
+
+  build-release:
+    aliases: [release, buildr]
+    desc: Build all packages in release mode
+    cmds:
+      - cargo build --workspace --release
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - cargo clean
+
+  # ----------------------------------------------------------------------------
+  # Run tasks
+  # ----------------------------------------------------------------------------
+
+  run-server:
+    desc: Run WebSocket server
+    summary: |
+      Run with:
+        - task run-server
+        - task run-server HOST=127.0.0.1 PORT=8080 (default)
+    vars:
+      HOST: '{{ .HOST | default "127.0.0.1" }}'
+      PORT: "{{ .PORT | default 8080 }}"
+    cmds:
+      - |
+        cargo run -p server --bin server -- \
+          --host {{.HOST}} \
+          --port {{.PORT}}
+
+  run-client:
+    desc: "[for debug] Run CLI client (use CLIENT_ID env var or default to 'alice')"
+    summary: |
+      Run with:
+
+      - task run-client
+      - task run-client CLIENT_ID=alice (default)
+      - task run-client CLIENT_ID=charlie
+      - task run-client URL=ws://127.0.0.1:8080/ws
+      - task run-client-alice
+    aliases: [run-client-alice]
+    vars:
+      CLIENT_ID: '{{ .CLIENT_ID | default "alice" }}'
+      URL: '{{ .URL | default "ws://127.0.0.1:8080/ws" }}'
+    cmds:
+      - |
+        cargo run -p client --bin client -- \
+          --client-id {{.CLIENT_ID}} \
+          --url {{.URL}}
+
+  # デバッグ用途
+  run-client-bob:
+    desc: "[for debug] Run CLI client (use CLIENT_ID env var or default to 'bob')"
+    summary: |
+      Run with:
+      - task run-client-bob
+      - task run-client-bob URL=ws://127.0.0.1:8080/ws
+    vars:
+      CLIENT_ID: '{{ .CLIENT_ID | default "bob" }}'
+      URL: '{{ .URL | default "ws://127.0.0.1:8080/ws" }}'
+    cmds:
+      - |
+        cargo run -p client --bin client -- \
+          --client-id {{.CLIENT_ID}} \
+          --url {{.URL}}
