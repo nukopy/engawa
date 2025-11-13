@@ -11,61 +11,98 @@
 
 ## プロジェクト構造とモジュール配置
 
-本プロジェクトはレイヤードアーキテクチャに基づいて構成されています。**サーバロジックを中心に設計**されており、クライアントはテスト用ユーティリティとして位置づけています。
+本プロジェクトは **Cargo Workspace** を使用した複数パッケージ構成です。**サーバロジックを中心に設計**されており、レイヤードアーキテクチャに基づいて構成されています。
 
 ### ディレクトリ構成
 
-```sh
-$ tree -L 2 .
+```txt
 .
-├── Cargo.toml              # プロジェクト設定、依存関係定義
+├── Cargo.toml              # workspace root（依存関係の一元管理）
 ├── README.md               # プロジェクト概要
 ├── AGENTS.md               # リポジトリガイドライン（本ファイル）
 ├── CLAUDE.md               # Claude への指示
 ├── docs/
+│   ├── adr/                # Architecture Decision Records
 │   ├── documentations/     # アーキテクチャ・DDD 設計ドキュメント
 │   ├── note/               # 開発メモ
 │   └── tasks/              # タスク管理ドキュメント
-├── src/
-│   ├── bin/                # 実行バイナリのエントリーポイント
-│   │   ├── server.rs       # サーバアプリケーション起動
-│   │   └── client.rs       # テスト用クライアント起動
-│   ├── common/             # 共通ユーティリティ（ロガー、時刻管理）
-│   ├── domain/             # ドメイン層（エンティティ、値オブジェクト、Factory）
-│   ├── infrastructure/     # インフラ層（DTO、変換ロジック）
-│   ├── ui/                 # UI 層（HTTP/WebSocket ハンドラー、ルーティング、状態管理）
-│   ├── usecase/            # UseCase 層（ビジネスロジック）※現在実装中
-│   ├── utils/              # ユーティリティ
-│   │   └── client/         # テスト用クライアント実装（旧 src/client/）
-│   └── lib.rs              # ライブラリエントリーポイント
-└── tests/
+├── packages/
+│   ├── shared/             # 共通ユーティリティパッケージ
+│   │   └── src/
+│   │       ├── time.rs     # 時刻管理（Clock trait, get_jst_timestamp）
+│   │       └── logger.rs   # ロガー設定
+│   ├── server/             # サーバアプリケーションパッケージ
+│   │   └── src/
+│   │       ├── bin/
+│   │       │   └── server.rs  # サーババイナリエントリーポイント
+│   │       ├── domain/        # ドメイン層
+│   │       ├── usecase/       # UseCase 層
+│   │       ├── infrastructure/ # インフラ層
+│   │       └── ui/            # UI 層
+│   └── client/             # クライアントアプリケーションパッケージ
+│       └── src/
+│           ├── bin/
+│           │   └── client.rs  # クライアントバイナリエントリーポイント
+│           ├── domain.rs      # クライアントドメインロジック
+│           ├── formatter.rs   # メッセージフォーマット
+│           └── session.rs     # WebSocket セッション管理
+└── tests/                  # workspace 全体の統合テスト
     ├── fixtures/           # テスト共有ヘルパー（TestServer, TestClient）
     ├── http_api.rs         # HTTP API 統合テスト
     ├── websocket_connection.rs  # WebSocket 接続テスト
     └── websocket_messaging.rs   # WebSocket メッセージングテスト
 ```
 
-### レイヤー構成
+### パッケージ構成
 
-本プロジェクトは以下のレイヤーで構成されています（依存方向：上→下）：
+本プロジェクトは以下の3つのパッケージで構成されています：
 
-- **UI 層** (`src/ui/`): HTTP/WebSocket ハンドラー、ルーティング設定、サーバー起動
-- **UseCase 層** (`src/usecase/`): ビジネスロジック、ユースケース実装 ※現在実装中
-- **Domain 層** (`src/domain/`): エンティティ、値オブジェクト、Factory、ドメインエラー
-- **Infrastructure 層** (`src/infrastructure/`): DTO（Data Transfer Object）、ドメインモデル変換
-- **Common** (`src/common/`): レイヤー横断的なユーティリティ（ロガー、時刻管理）
+1. **shared パッケージ** (`packages/shared/`)
+   - 技術的ユーティリティ（時刻管理、ロガー）
+   - 他のパッケージから参照される共通基盤
 
-詳細なモジュール構成と設計方針は `docs/documentations/software-architecture.md` を参照してください。
+2. **server パッケージ** (`packages/server/`)
+   - レイヤードアーキテクチャによる4層構造
+   - **UI 層** (`ui/`): HTTP/WebSocket ハンドラー、ルーティング設定、サーバー起動
+   - **UseCase 層** (`usecase/`): ビジネスロジック、ユースケース実装
+   - **Domain 層** (`domain/`): エンティティ、値オブジェクト、Factory、ドメインエラー
+   - **Infrastructure 層** (`infrastructure/`): DTO（Data Transfer Object）、ドメインモデル変換
+   - 依存関係: `shared` パッケージに依存
+
+3. **client パッケージ** (`packages/client/`)
+   - CLI チャットクライアント実装
+   - シンプルな構成（テスト用ユーティリティとしての位置づけ）
+   - 依存関係: `shared`, `server/infrastructure/dto` に依存
+
+詳細なモジュール構成と設計方針は [ソフトウェアアーキテクチャ](./docs/documentations/software-architecture.md) および [ADR 0002: Cargo Workspace 構造への移行](./docs/adr/0002-cargo-workspace-structure.md) を参照してください。
 
 ## ビルド・テスト・開発コマンド
 
-- `cargo fmt` : Rustfmt で全ファイルを整形し、PR 直前に必ず実行します。
-- `cargo clippy --all-targets --all-features` : Axum マクロや Tokio の非同期コードを含め lint します。
-- `cargo test` : 追加した単体・統合テストを一括実行し、フェイル時は `-- --nocapture` で詳細を追跡します。
-- `cargo run --bin server` : WebSocket サーバを起動し、`RUST_LOG=info` で通信ログを確認できます。
-- `cargo run --bin client -- --client-id alice` : 任意の `client_id` でクライアントを起動（例：別ターミナルで bob）。
+### ビルド
 
-実装タスクを行ったとき、必ず `cargo fmt`、`cargo clippy --all-targets --all-features`、`cargo test` を実行してください。これらが通るまでタスクを終了しないでください。
+- `cargo build --workspace` : workspace 全体をビルドします。
+- `cargo build -p server` : server パッケージのみビルドします。
+- `cargo build -p client` : client パッケージのみビルドします。
+- `cargo build -p shared` : shared パッケージのみビルドします。
+
+### テスト
+
+- `cargo test --workspace` : workspace 全体のテストを実行します。フェイル時は `-- --nocapture` で詳細を追跡します。
+- `cargo test -p server` : server パッケージのテストのみ実行します。
+- `cargo test -p client` : client パッケージのテストのみ実行します。
+- `cargo test -p shared` : shared パッケージのテストのみ実行します。
+
+### Lint・フォーマット
+
+- `cargo fmt --workspace` : workspace 全体を Rustfmt で整形します。PR 直前に必ず実行してください。
+- `cargo clippy --workspace --all-targets --all-features` : Axum マクロや Tokio の非同期コードを含め lint します。
+
+### 実行
+
+- `cargo run -p server --bin server` : WebSocket サーバを起動します。`RUST_LOG=info` で通信ログを確認できます。
+- `cargo run -p client --bin client -- --client-id alice` : 任意の `client_id` でクライアントを起動します（例：別ターミナルで bob）。
+
+**重要**: 実装タスクを行ったとき、必ず `cargo fmt --workspace`、`cargo clippy --workspace --all-targets --all-features`、`cargo test --workspace` を実行してください。これらが通るまでタスクを終了しないでください。
 
 ## コーディングスタイルと命名
 

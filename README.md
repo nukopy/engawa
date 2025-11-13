@@ -7,6 +7,16 @@
 
 Layered Architecture / DDD を採用した、Rust + Axum + WebSocket のチャットアプリ
 
+## プロジェクト構成
+
+本プロジェクトは Cargo Workspace を使用した複数パッケージ構成です：
+
+- **packages/shared**: 共通ユーティリティ（時刻管理、ロガー）
+- **packages/server**: サーバアプリケーション（Layered Architecture による4層構造）
+- **packages/client**: CLIクライアントアプリケーション
+
+詳細は [AGENTS.md](./AGENTS.md) および [ソフトウェアアーキテクチャドキュメント](./docs/documentations/software-architecture.md) を参照してください。
+
 ## 技術スタック
 
 - Rust 1.90.0
@@ -55,33 +65,77 @@ graph TD
 - `bin/server`: WebSocket チャットサーバ。接続中のクライアント間でメッセージをブロードキャストします（送信者自身には送信されません）
 - `bin/client`: インタラクティブなチャットクライアント。ユニークな `client_id` で接続し、再接続機能を持ちます
 
+## 開発
+
+### ビルド
+
+```sh
+# workspace 全体をビルド
+cargo build --workspace
+# cargo build でも OK
+
+# 個別パッケージのビルド
+cargo build -p server
+cargo build -p client
+cargo build -p shared
+```
+
+### テスト
+
+```sh
+# workspace 全体のテスト
+cargo test --workspace
+# cargo test でも OK
+
+# 個別パッケージのテスト
+cargo test -p server
+cargo test -p client
+cargo test -p shared
+```
+
+### Lint・フォーマット
+
+```sh
+# Clippy（lint）
+cargo clippy --workspace --all-targets --all-features
+
+# フォーマット
+cargo fmt --workspace
+```
+
 ## 実行
 
 ### サーバの起動
 
 ```sh
-cargo run --bin server
+cargo run -p server --bin server
+
+# ポート指定
+cargo run -p server --bin server -- --p 8080
 ```
 
 help
 
 ```sh
-cargo run --bin server -- --help
+cargo run -p server --bin server -- --help
 ```
 
 ### クライアントの起動
 
 ```sh
-cargo run --bin client -- --client-id alice
+cargo run -p client --bin client -- --client-id alice
+
+# サーバURL指定
+cargo run -p client --bin client -- --client-id alice --url ws://127.0.0.1:8080/ws
 
 # 別ターミナルで起動
-cargo run --bin client -- --client-id bob
+cargo run -p client --bin client -- --client-id bob
 ```
 
 help
 
 ```sh
-cargo run --bin client -- --help
+cargo run -p client --bin client -- --help
 ```
 
 ### 特徴

@@ -2,6 +2,10 @@
 
 本プロジェクトのソフトウェアアーキテクチャは [レイヤードアーキテクチャ](./layered-architecture.md) を適用しています。
 
+## プロジェクト構成
+
+本プロジェクトは **Cargo Workspace** を使用した複数パッケージ構成です。サーバアプリケーション（`packages/server/`）にレイヤードアーキテクチャを適用しています。詳細は [ADR 0002: Cargo Workspace 構造への移行](../adr/0002-cargo-workspace-structure.md) を参照してください。
+
 ## レイヤードアーキテクチャの各レイヤーの定義
 
 参照元：[@docs/documentations/layered-architecture.md](./layered-architecture.md)
@@ -53,8 +57,10 @@
 
 **配置場所**:
 
-- `src/server/handler.rs` - WebSocket ハンドラー、REST API ハンドラー
-- `src/server/runner.rs` - サーバー起動とルーティング設定
+- `packages/server/src/ui/handler/websocket.rs` - WebSocket ハンドラー
+- `packages/server/src/ui/handler/http.rs` - HTTP API ハンドラー
+- `packages/server/src/ui/server.rs` - サーバー起動とルーティング設定
+- `packages/server/src/ui/state.rs` - アプリケーション状態管理
 
 **依存関係**:
 
@@ -72,17 +78,14 @@
 
 **配置場所**:
 
-- 現在のプロジェクトでは、UseCase 層は明示的に分離されていません
-- サーバーハンドラー内にビジネスロジックが含まれている状態です
-- 将来的に `src/usecase/` ディレクトリを作成し、以下のように分離することを推奨します：
-
-  ```sh
-  src/usecase/
-  ├── mod.rs
-  ├── connect_participant.rs    # 参加者接続のユースケース
-  ├── send_message.rs           # メッセージ送信のユースケース
-  └── disconnect_participant.rs # 参加者切断のユースケース
-  ```
+- `packages/server/src/usecase/` - UseCase 層のユースケース実装
+  - `connect_participant.rs` - 参加者接続のユースケース
+  - `disconnect_participant.rs` - 参加者切断のユースケース
+  - `send_message.rs` - メッセージ送信のユースケース
+  - `get_rooms.rs` - ルーム一覧取得のユースケース
+  - `get_room_detail.rs` - ルーム詳細取得のユースケース
+  - `get_room_state.rs` - ルーム状態取得のユースケース
+  - `error.rs` - UseCase 層のエラー定義
 
 **依存関係**:
 
@@ -100,13 +103,16 @@
 
 **配置場所**:
 
-- `src/domain/entity.rs` - Room, Participant, ChatMessage（Entity）
-- `src/domain/value_object.rs` - ClientId, RoomId, MessageContent, Timestamp（Value Object）
-- `src/domain/error.rs` - ドメイン層のエラー定義（thiserror 使用）
+- `packages/server/src/domain/entity.rs` - Room, Participant, ChatMessage（Entity）
+- `packages/server/src/domain/value_object.rs` - ClientId, RoomId, MessageContent, Timestamp（Value Object）
+- `packages/server/src/domain/repository.rs` - Repository trait 定義
+- `packages/server/src/domain/message_pusher.rs` - MessagePusher trait 定義
+- `packages/server/src/domain/factory.rs` - Factory 関数
+- `packages/server/src/domain/error.rs` - ドメイン層のエラー定義（thiserror 使用）
 
 **エラーハンドリング**:
 
-- **ドメイン層のエラーは `thiserror` を使って `src/domain/error.rs` に定義します**
+- **ドメイン層のエラーは `thiserror` を使って `packages/server/src/domain/error.rs` に定義します**
 - Value Object のバリデーションエラーは `ValueObjectError` enum で定義
 - エラーメッセージは構造化されたフィールドを持ち、実際の値と期待値を含む
 - 例: `ClientIdTooLong { max: usize, actual: usize }`
@@ -134,22 +140,32 @@
 
 **配置場所**:
 
-- `src/infrastructure/dto.rs` - WebSocket メッセージ、API レスポンスの DTO
-- `src/infrastructure/conversion.rs` - DTO ⇔ Domain Model の変換ロジック
+- `packages/server/src/infrastructure/dto/` - WebSocket メッセージ、API レスポンスの DTO
+  - `websocket.rs` - WebSocket メッセージ DTO
+  - `http.rs` - HTTP API レスポンス DTO
+- `packages/server/src/infrastructure/conversion.rs` - DTO ⇔ Domain Model の変換ロジック
+- `packages/server/src/infrastructure/repository/` - Repository の実装
+  - `in_memory_room_repository.rs` - インメモリ Room Repository
+- `packages/server/src/infrastructure/message_pusher/` - MessagePusher の実装
+  - `websocket_message_pusher.rs` - WebSocket MessagePusher
 
 将来的にデータベースを導入する場合、以下のような構造を推奨します：
 
   ```sh
-  src/infrastructure/
+  packages/server/src/infrastructure/
   ├── mod.rs
-  ├── dto.rs                       # DTO 定義
-  ├── conversion.rs                # DTO 変換ロジック
+  ├── dto/
+  │   ├── mod.rs
+  │   ├── websocket.rs              # WebSocket DTO
+  │   └── http.rs                   # HTTP API DTO
+  ├── conversion.rs                 # DTO 変換ロジック
   ├── repository/
   │   ├── mod.rs
-  │   ├── room_repository.rs        # Room の永続化
-  │   └── message_repository.rs     # Message の永続化
+  │   ├── in_memory_room_repository.rs  # 現在の実装
+  │   ├── room_repository.rs            # DB 版 Room の永続化
+  │   └── message_repository.rs         # DB 版 Message の永続化
   └── external/
-      └── notification_client.rs    # 外部通知サービスのクライアント
+      └── notification_client.rs        # 外部通知サービスのクライアント
   ```
 
 **DTO の配置について**:
@@ -177,29 +193,60 @@
 現在のプロジェクト構造:
 
 ```sh
-src/
-├── infrastructure/          # Infrastructure 層
-│   ├── mod.rs
-│   ├── conversion.rs       # DTO ⇔ Domain Entity 変換
-│   └── dto/
-│       ├── mod.rs
-│       ├── websocket.rs    # WebSocket DTO 定義
-│       └── http.rs         # HTTP API DTO 定義
-├── domain/                  # Domain 層
-│   ├── mod.rs
-│   ├── entity.rs           # Entity（Room, Participant, ChatMessage）
-│   ├── value_object.rs     # Value Object（ClientId, RoomId, etc.）
-│   └── error.rs            # ドメインエラー定義
-├── server/                  # UserInterface 層（サーバー）
-│   ├── handler.rs          # ハンドラー
-│   ├── runner.rs           # ルーティング
-│   ├── state.rs            # 状態管理
-│   ├── signal.rs           # シグナル処理
-│   └── domain.rs           # ※要リネーム（ドメインロジックではない）
-└── client/                  # UserInterface 層（クライアント）
-    ├── session.rs          # クライアント
-    ├── formatter.rs        # 表示フォーマット
-    └── domain.rs           # ※要リネーム（ドメインロジックではない）
+packages/
+├── shared/                      # 共通ユーティリティ
+│   └── src/
+│       ├── time.rs             # 時刻管理（Clock trait, get_jst_timestamp）
+│       └── logger.rs           # ロガー設定
+├── server/                      # サーバアプリケーション
+│   └── src/
+│       ├── bin/
+│       │   └── server.rs       # サーバーバイナリエントリーポイント
+│       ├── domain/             # Domain 層
+│       │   ├── mod.rs
+│       │   ├── entity.rs       # Entity（Room, Participant, ChatMessage）
+│       │   ├── value_object.rs # Value Object（ClientId, RoomId, etc.）
+│       │   ├── repository.rs   # Repository trait
+│       │   ├── message_pusher.rs # MessagePusher trait
+│       │   ├── factory.rs      # Factory 関数
+│       │   └── error.rs        # ドメインエラー定義
+│       ├── usecase/            # UseCase 層
+│       │   ├── mod.rs
+│       │   ├── connect_participant.rs
+│       │   ├── disconnect_participant.rs
+│       │   ├── send_message.rs
+│       │   ├── get_rooms.rs
+│       │   ├── get_room_detail.rs
+│       │   ├── get_room_state.rs
+│       │   └── error.rs
+│       ├── infrastructure/     # Infrastructure 層
+│       │   ├── mod.rs
+│       │   ├── conversion.rs   # DTO ⇔ Domain Entity 変換
+│       │   ├── dto/
+│       │   │   ├── mod.rs
+│       │   │   ├── websocket.rs # WebSocket DTO
+│       │   │   └── http.rs      # HTTP API DTO
+│       │   ├── repository/
+│       │   │   ├── mod.rs
+│       │   │   └── in_memory_room_repository.rs
+│       │   └── message_pusher/
+│       │       ├── mod.rs
+│       │       └── websocket_message_pusher.rs
+│       └── ui/                 # UserInterface 層
+│           ├── mod.rs
+│           ├── server.rs       # サーバー起動
+│           ├── state.rs        # 状態管理
+│           └── handler/
+│               ├── mod.rs
+│               ├── http.rs     # HTTP ハンドラー
+│               └── websocket.rs # WebSocket ハンドラー
+└── client/                      # クライアントアプリケーション
+    └── src/
+        ├── bin/
+        │   └── client.rs       # クライアントバイナリエントリーポイント
+        ├── domain.rs           # クライアントドメインロジック
+        ├── formatter.rs        # メッセージフォーマット
+        └── session.rs          # WebSocket セッション管理
 ```
 
 ## エラーハンドリング方針
@@ -214,22 +261,22 @@ src/
 
 **レイヤーごとのエラー配置**:
 
-1. **Domain 層**: `src/domain/error.rs`
+1. **Domain 層**: `packages/server/src/domain/error.rs`
    - Value Object のバリデーションエラー
    - ビジネスルール違反のエラー
    - 例: `ValueObjectError::ClientIdEmpty`, `ValueObjectError::ClientIdTooLong { max, actual }`
 
-2. **Infrastructure 層**: `src/infrastructure/error.rs`（将来実装予定）
+2. **Infrastructure 層**: `packages/server/src/infrastructure/error.rs`（将来実装予定）
    - データベース接続エラー
    - 外部 API 呼び出しエラー
    - DTO 変換エラー（必要に応じて）
 
-3. **UseCase 層**: `src/usecase/error.rs`（将来実装予定）
+3. **UseCase 層**: `packages/server/src/usecase/error.rs`
    - ユースケース固有のエラー
    - トランザクション管理エラー
 
 4. **UserInterface 層**: 各層のエラーを適切な HTTP ステータスコードやレスポンスに変換
-   - `src/error.rs` に既存のクライアントエラーが定義されている
+   - `packages/server/src/ui/` 内でエラーハンドリング
 
 **エラー変換**:
 
@@ -238,18 +285,20 @@ src/
 
 ## 今後の改善案
 
-1. **UseCase 層の分離**
-   - `src/usecase/` を作成し、ビジネスロジックをハンドラーから分離
+1. **データベースの導入**（必要に応じて）
+   - `packages/server/src/infrastructure/repository/` に DB 版 Repository を追加
+   - インメモリ実装と DB 実装を切り替え可能にする
 
-2. **Infrastructure 層の導入**（必要に応じて）
-   - データベース導入時に `src/infrastructure/repository/` を作成
+2. **Infrastructure 層のエラー定義**
+   - `packages/server/src/infrastructure/error.rs` を作成
+   - データベース接続エラー、外部 API エラーを定義
 
-3. **ファイル名の明確化**
-   - `server/domain.rs` → `server/participant_logic.rs` または `server/broadcast_logic.rs`
-   - `client/domain.rs` → `client/reconnection_logic.rs` または `client/session_logic.rs`
-
-4. **DTO の分離**（プロジェクトが大きくなった場合）
+3. **DTO の分離**（プロジェクトが大きくなった場合）
    - WebSocket 用と REST API 用で DTO を分離
+
+4. **TUI クライアントの追加**
+   - `packages/tui-client/` を追加
+   - Ratatui を使用したターミナル UI クライアント
 
 ## モジュール命名規約
 
@@ -266,19 +315,28 @@ src/
 現在のプロジェクト構造:
 
 ```sh
-src/domain/
+packages/server/src/domain/
 ├── mod.rs
 ├── entity.rs          # ✅ 単数形（Entity）
 ├── value_object.rs    # ✅ 単数形（Value Object）
+├── repository.rs      # ✅ 単数形（Repository）
+├── message_pusher.rs  # ✅ 単数形（MessagePusher）
+├── factory.rs         # ✅ 単数形（Factory）
 └── error.rs           # ✅ 単数形（Error）
 
-src/infrastructure/
+packages/server/src/infrastructure/
 ├── mod.rs
 ├── conversion.rs
-└── dto/
+├── dto/
+│   ├── mod.rs
+│   ├── websocket.rs   # WebSocket DTO
+│   └── http.rs        # HTTP API DTO
+├── repository/
+│   ├── mod.rs
+│   └── in_memory_room_repository.rs
+└── message_pusher/
     ├── mod.rs
-    ├── websocket.rs   # WebSocket DTO
-    └── http.rs        # HTTP API DTO
+    └── websocket_message_pusher.rs
 ```
 
 ## ドメインモデリング（DDD）
@@ -291,7 +349,7 @@ DDD の基本的な概念と Value Object パターンについては、`docs/do
 
 ### Value Objects
 
-以下のプリミティブ型は Value Object として定義されています（`src/domain/value_object.rs`）：
+以下のプリミティブ型は Value Object として定義されています（`packages/server/src/domain/value_object.rs`）：
 
 - **ClientId**: クライアント識別子（最大100文字、空文字列不可）
 - **RoomId**: ルーム識別子（最大100文字、空文字列不可）
@@ -308,7 +366,7 @@ Value Object の特徴：
 
 ### Domain Entities
 
-ドメインエンティティは `src/domain/entity.rs` に定義されています：
+ドメインエンティティは `packages/server/src/domain/entity.rs` に定義されています：
 
 - **Room**: チャットルーム（Entity）- RoomId、参加者リスト、メッセージ履歴、容量制限を保持
 - **Participant**: 参加者（Entity）- ClientId、接続時刻を保持
@@ -316,9 +374,9 @@ Value Object の特徴：
 
 ### DTO と Domain Entity の分離
 
-- **DTO（Data Transfer Object）**: `src/infrastructure/dto/` - WebSocket・HTTP API 通信用の型定義
-- **Domain Entity**: `src/domain/entity.rs` - ビジネスロジック用のエンティティ定義
-- **Conversion**: `src/infrastructure/conversion.rs` - DTO と Domain Entity の相互変換ロジック
+- **DTO（Data Transfer Object）**: `packages/server/src/infrastructure/dto/` - WebSocket・HTTP API 通信用の型定義
+- **Domain Entity**: `packages/server/src/domain/entity.rs` - ビジネスロジック用のエンティティ定義
+- **Conversion**: `packages/server/src/infrastructure/conversion.rs` - DTO と Domain Entity の相互変換ロジック
 
 DTO は外部とのインターフェースのみに使用し、内部のビジネスロジックでは Domain Entity を使用してください。
 
