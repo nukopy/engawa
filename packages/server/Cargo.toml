@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 documentation.workspace = true
 categories.workspace = true
-keywords = ["axum", "server", "websocket", "chat", "engawa", "layered architecture", "ddd"]
+keywords = ["chat", "server", "axum", "websocket"]
 publish = true
 
 [[bin]]
